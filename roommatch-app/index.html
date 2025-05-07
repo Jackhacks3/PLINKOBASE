@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RoomMatch - Find Your Perfect Roommate</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      #debug-info {
+        position: fixed;
+        top: 0;
+        left: 0;
+        background: white;
+        padding: 10px;
+        font-family: monospace;
+        z-index: 9999;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="debug-info">Loading... If you see only this text, JavaScript failed to load.</div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Add basic debugging to help identify issues
+      window.addEventListener('load', () => {
+        document.getElementById('debug-info').textContent = 'Page loaded successfully!';
+        setTimeout(() => {
+          document.getElementById('debug-info').style.display = 'none';
+        }, 3000);
+      });
+      window.addEventListener('error', (event) => {
+        document.getElementById('debug-info').textContent = 'Error: ' + event.message;
+        document.getElementById('debug-info').style.display = 'block';
+      });
+    </script>
+  </body>
+</html> 
