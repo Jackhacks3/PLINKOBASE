@@ -12,18 +12,11 @@ function log(message) {
 try {
   log('Starting Vercel build process...');
   
-  // Remove node_modules and package-lock.json to start fresh
+  // Remove node_modules to start fresh
   log('Cleaning previous installations...');
   if (fs.existsSync('node_modules')) {
     execSync('rm -rf node_modules', { stdio: 'inherit' });
   }
-  if (fs.existsSync('package-lock.json')) {
-    execSync('rm -f package-lock.json', { stdio: 'inherit' });
-  }
-  
-  // Install specific version of webpack config first
-  log('Installing @expo/webpack-config beta...');
-  execSync('npm install @expo/webpack-config@19.0.0-beta.1 --no-save --legacy-peer-deps', { stdio: 'inherit' });
   
   // Install dependencies with legacy peer deps flag
   log('Installing main dependencies...');
@@ -39,60 +32,80 @@ module.exports = async function(env, argv) {
   const config = await createExpoWebpackConfig(
     {
       ...env,
-      babel: { dangerouslyAddModulePathsToTranspile: ['@benjeau/react-native-draw'] }
+      babel: { 
+        dangerouslyAddModulePathsToTranspile: ['@benjeau/react-native-draw'] 
+      }
     },
-    argv
+    {
+      ...argv,
+      mode: 'production'
+    }
   );
   
-  // Return the modified config
   return config;
 };
 `;
 
   fs.writeFileSync('./webpack.config.js', webpackConfigContent);
   
-  // Run the web export command using our custom webpack config
+  // Try basic web export method
   log('Exporting the web build...');
-  execSync('npx expo export:web', { stdio: 'inherit' });
+  try {
+    execSync('npx expo export:web', { stdio: 'inherit' });
+  } catch (exportError) {
+    log('Error with export:web command, trying alternative export method...');
+    // If the first method fails, try a workaround
+    execSync('npx expo export --platform web', { stdio: 'inherit' });
+  }
   
   // Ensure dist directory has all required files
   if (!fs.existsSync('./dist')) {
-    log('Creating dist directory...');
+    log('Export did not create dist directory, creating manually...');
     fs.mkdirSync('./dist', { recursive: true });
+    
+    // If web-build exists, copy its content to dist
+    if (fs.existsSync('./web-build')) {
+      log('Copying web-build content to dist...');
+      execSync('cp -r ./web-build/* ./dist/', { stdio: 'inherit' });
+    }
   }
   
-  // Copy the index.html to the dist directory if needed
-  const srcIndexPath = './index.html';
+  // Copy the index.html to the dist directory if it doesn't exist
   const distIndexPath = './dist/index.html';
   
-  if (fs.existsSync(srcIndexPath) && !fs.existsSync(distIndexPath)) {
-    log('Copying index.html to dist folder...');
-    fs.copyFileSync(srcIndexPath, distIndexPath);
-  }
-  
-  // Create a dummy server.js file to satisfy Vercel
-  log('Creating server file...');
-  const serverContent = `
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-
-const server = http.createServer((req, res) => {
-  // Serve index.html for all routes
-  const filePath = path.resolve(__dirname, './dist/index.html');
-  const content = fs.readFileSync(filePath);
-  
-  res.writeHead(200, { 'Content-Type': 'text/html' });
-  res.end(content);
-});
-
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-  console.log(\`Server running at http://localhost:\${port}/\`);
-});
+  if (!fs.existsSync(distIndexPath)) {
+    log('Creating a fallback index.html...');
+    
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>Plinko Lottery Game</title>
+    <style>
+      body { margin: 0; padding: 0; font-family: sans-serif; }
+      .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+      .spinner { width: 50px; height: 50px; border: 5px solid rgba(0, 0, 0, 0.1); border-radius: 50%; border-top-color: #09d; animation: spin 1s ease-in-out infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Loading Plinko Game...</p>
+      </div>
+    </div>
+    <script>
+      window.location.href = '/index.bundle.js';
+    </script>
+  </body>
+</html>
 `;
-
-  fs.writeFileSync('./server.js', serverContent);
+    
+    fs.writeFileSync(distIndexPath, htmlContent);
+  }
   
   log('Build completed successfully!');
 } catch (error) {
